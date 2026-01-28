@@ -1,0 +1,68 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+  line-height: 1.6;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+section {
+  margin-bottom: 60px;
+}
+
+h2 {
+  margin-bottom: 15px;
+}
+
+ul {
+  padding-left: 20px;
+}
+
+#contactForm input,
+#contactForm textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+button {
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+#error {
+  color: red;
+  margin-top: 10px;
+}
+html {
+  scroll-behavior: smooth;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #ddd;
+  z-index: 1000;
+}
+
+.navbar ul {
+  display: flex;
+  list-style: none;
+  gap: 20px;
+}
+
+.navbar a {
+  text-decoration: none;
+  color: #333;
+  font-weight: 600;
+}
