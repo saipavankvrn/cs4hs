@@ -1,0 +1,1 @@
+Smart Study Planner with Adaptive Scheduling
