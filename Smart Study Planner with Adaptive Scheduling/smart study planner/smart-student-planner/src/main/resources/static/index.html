@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Student Planner | Weekly Grids</title>
+    <!-- Modern Typography Requirements -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <!-- Sleek Sidebar -->
+    <nav class="sidebar glass-panel">
+        <div class="logo">🚀 Antigravity</div>
+        <ul class="nav-links">
+            <li><a href="index.html" class="active">Timetable</a></li>
+            <li><a href="focus.html">Focus Mode</a></li>
+            <li><a href="#">Analysis Board</a></li>
+            <li><a href="#">Settings</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <div>
+                <h1>Your Schedule Matrix</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Live Data: Fetching directly from Java/MySQL.</p>
+            </div>
+            <button class="btn-glow" onclick="window.location.href='focus.html'">Enter Focus Realm →</button>
+        </header>
+
+        <!-- Live MySQL Subject Input Form -->
+        <section class="glass-panel" style="padding: 20px; margin-bottom: 20px; display: flex; gap: 16px; align-items:flex-end; flex-wrap:wrap;">
+            <div style="flex:1; min-width: 200px;">
+                <label style="font-size:0.85rem; color:var(--text-muted); display:block; margin-bottom:6px;">Subject Title</label>
+                <input type="text" id="newTaskTitle" placeholder="e.g. Calculus Midterm Study" style="width:100%; border-radius:8px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white; font-family:inherit;">
+            </div>
+            <div style="flex:1; min-width: 200px;">
+                <label style="font-size:0.85rem; color:var(--text-muted); display:block; margin-bottom:6px;">Target Deadline</label>
+                <input type="datetime-local" id="newTaskDeadline" style="width:100%; border-radius:8px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white; font-family:inherit; color-scheme: dark;">
+            </div>
+            <div style="flex:0.5; min-width: 100px;">
+                <label style="font-size:0.85rem; color:var(--text-muted); display:block; margin-bottom:6px;">Confidence (1-5)</label>
+                <input type="number" id="newTaskConfidence" min="1" max="5" value="3" style="width:100%; border-radius:8px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white; font-family:inherit;">
+            </div>
+            <button class="btn-glow" id="btnAddTask" style="height:44px; padding: 0 24px; font-weight:700;">+ Add Subject</button>
+        </section>
+
+        <!-- Dynamic CSS Grid Weekly Timetable -->
+        <section class="weekly-grid-container glass-panel">
+            <div class="grid-header">
+                <div class="time-col">Time</div>
+                <div class="day-col">Mon</div>
+                <div class="day-col">Tue</div>
+                <div class="day-col">Wed</div>
+                <div class="day-col">Thu</div>
+                <div class="day-col">Fri</div>
+                <div class="day-col">Sat</div>
+                <div class="day-col">Sun</div>
+            </div>
+            <!-- JS dynamically inserts hours and 7 cell tracks per row -->
+            <div class="grid-body" id="timetableGrid">
+                <!-- Generated dynamically inside app.js -->
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

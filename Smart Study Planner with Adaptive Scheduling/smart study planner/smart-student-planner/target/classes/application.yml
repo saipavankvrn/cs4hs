@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: smart-student-planner
+  datasource:
+    url: jdbc:mysql://localhost:3306/smart_student_planner?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true
+    username: root
+    password: J12Y05@12345
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true

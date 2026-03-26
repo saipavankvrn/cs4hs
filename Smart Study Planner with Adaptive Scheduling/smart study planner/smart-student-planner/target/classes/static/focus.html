@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Mode | Deep Work</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme focus-layout">
+    
+    <!-- Top HUD Banner -->
+    <header class="focus-header glass-panel">
+        <div class="task-info">
+            <h2 id="focusTaskTitle">Advanced Quantum Mechanics</h2>
+            <p>Priority Score: <span style="color:var(--accent);font-weight:bold;">92.5</span> | Session Block: 1 of 2</p>
+        </div>
+        
+        <!-- Interactive 25/5 Pomodoro -->
+        <div class="pomodoro-timer">
+            <div class="timer-display" id="timerDisplay">25:00</div>
+            <div class="timer-controls">
+                <button id="btnStartTimer" class="btn-glow">Start Engine</button>
+                <button id="btnPauseTimer" class="btn-secondary">Pause</button>
+                <button id="btnResetTimer" class="btn-secondary">Reset</button>
+                <button id="btnToggleMode" class="btn-text">Switch to Rest</button>
+            </div>
+        </div>
+        
+        <a href="index.html" class="btn-close">Exit Focus</a>
+    </header>
+
+    <div class="focus-workspace">
+        
+        <!-- Immersive Subject PDF Viewer via iframe -->
+        <div class="pdf-panel glass-panel">
+            <h3>Subject Material</h3>
+            <iframe src="about:blank" class="pdf-viewer" id="pdfViewer" title="Reference PDF"></iframe>
+            <div class="pdf-overlay" id="pdfOverlay">Awaiting Document / PDF source injection.</div>
+        </div>
+
+        <div class="tools-panel">
+            
+            <!-- Dynamic HTML5 Canvas Whiteboard -->
+            <div class="whiteboard-container glass-panel">
+                <div class="panel-header">
+                    <h3>Drafting Pad</h3>
+                    <button class="btn-text" id="btnClearCanvas">Clear Ink</button>
+                </div>
+                <canvas id="whiteboard"></canvas>
+            </div>
+
+            <!-- Pre vs Actual Post-Study Form Tracker -->
+            <div class="post-study-form glass-panel">
+                <h3>Post-Session Analytics</h3>
+                <form id="sessionForm">
+                    <div class="form-group">
+                        <label for="focusScore">Mental Focus Level: <span id="focusVal" style="color:var(--accent)">4</span></label>
+                        <input type="range" id="focusScore" min="1" max="5" value="4">
+                    </div>
+                    <div class="form-group">
+                        <label for="confidenceScore">Confidence in Topic: <span id="confidenceVal" style="color:var(--accent)">3</span></label>
+                        <input type="range" id="confidenceScore" min="1" max="5" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="studyNotes">Plan vs. Actual Retrospective</label>
+                        <textarea id="studyNotes" rows="3" placeholder="What blocked you today? What did you master?"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary w-100">Finalize Session →</button>
+                </form>
+            </div>
+            
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
