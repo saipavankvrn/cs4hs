@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,8 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body class="dark-theme focus-layout">
-    
+
     <!-- Top HUD Banner -->
     <header class="focus-header glass-panel">
         <div class="task-info">
@@ -32,7 +34,7 @@
 
     <div class="focus-workspace">
         
-        <!-- Immersive Subject PDF Viewer via iframe -->
+        <!-- Immersive Subject PDF Viewer -->
         <div class="pdf-panel glass-panel">
             <h3>Subject Material</h3>
             <iframe src="about:blank" class="pdf-viewer" id="pdfViewer" title="Reference PDF"></iframe>
@@ -41,6 +43,19 @@
 
         <div class="tools-panel">
             
+            <!-- NEW: Real-time Resource & Key Points Tracker -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h3>Real-time Insights</h3>
+                <div id="keyPointsList" style="margin: 10px 0; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                    <span style="color:var(--text-muted); font-size:0.9rem;">No points recorded yet for this session...</span>
+                </div>
+                <form id="resourceUploadForm" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:10px;">
+                    <input type="text" id="keyPointInput" placeholder="Add a key takeaway point..." class="w-100" style="padding:10px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white; font-family:inherit;">
+                    <input type="file" id="focusFile" style="font-size:0.8rem; color:var(--text-muted);">
+                    <button type="submit" class="btn-glow w-100">Sync Study Assets</button>
+                </form>
+            </div>
+
             <!-- Dynamic HTML5 Canvas Whiteboard -->
             <div class="whiteboard-container glass-panel">
                 <div class="panel-header">
@@ -72,7 +87,8 @@
             
         </div>
     </div>
-    
+
     <script src="app.js"></script>
 </body>
+
 </html>

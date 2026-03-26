@@ -14,6 +14,15 @@ public class PriorityEngine {
      * @param confidenceScore The student's estimated confidence on the task material (1 to 5).
      * @return The calculated priority score double.
      */
+    /**
+     * Calculates the dynamic priority of a task based on the provided formula.
+     * Formula: (DeadlineWeight * 1.5) + (MissedCount * 10) + ((5 - ConfidenceScore) * 8)
+     * 
+     * @param deadline The exact deadline of the task.
+     * @param missedCount Number of times the task was missed.
+     * @param confidenceScore The student's estimated confidence on the task material (1 to 5).
+     * @return The calculated priority score double.
+     */
     public double calculatePriority(LocalDateTime deadline, int missedCount, int confidenceScore) {
         // Enforce boundary constraints for ConfidenceScore (1 to 5)
         int boundedConfidence = Math.max(1, Math.min(5, confidenceScore));

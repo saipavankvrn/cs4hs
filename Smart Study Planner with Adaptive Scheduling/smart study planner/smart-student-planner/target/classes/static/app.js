@@ -63,12 +63,11 @@ if (timetableGrid) {
                     card.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                             <div class="title" style="word-break:break-word; max-width:85%;">${task.title}</div>
-                            <span class="btn-delete-task" data-id="${task.id}" style="cursor:pointer; font-size:1.2rem; line-height:1; font-weight:bold; opacity:0.7; transition:0.2s;" onmouseover="this.style.color='#ef4444'; this.style.opacity='1'" onmouseout="this.style.color=''; this.style.opacity='0.7'" title="Delete Subject">&times;</span>
+                            <span class="btn-delete-task" data-id="${task.id}" style="cursor:pointer; font-size:1.2rem;">&times;</span>
                         </div>
                         <div style="font-size:0.8rem; margin-top:2px; opacity:0.8;">
                             Priority: <b>${task.priorityScore}</b><br/>Missed Slots: ${task.missedCount}
-                        </div>
-                    `;
+                        </div>`;
                     targetCell.appendChild(card);
                 }
             });
@@ -328,6 +327,84 @@ if(focusScore) {
                 submitBtn.style.background = '';
                 submitBtn.textContent = defaultText;
             }, 3500);
+        }
+    });
+}
+
+// 5. Senior Logic: Handling Binary Uploads + Instant UI Updates
+const resourceUploadForm = document.getElementById('resourceUploadForm');
+const keyPointsList = document.getElementById('keyPointsList');
+
+if (resourceUploadForm) {
+    resourceUploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('focusFile');
+        const pointInput = document.getElementById('keyPointInput');
+        
+        // Validation: Require at least a point or a file
+        if (!pointInput.value && !fileInput.files[0]) {
+            return alert("Please enter a point or select a file to sync.");
+        }
+
+        // Use FormData for Multipart File + Text Support
+        const formData = new FormData();
+        formData.append('userId', 1);
+        formData.append('keyPoint', pointInput.value);
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        }
+
+        const submitBtn = resourceUploadForm.querySelector('button');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "Syncing with Cloud...";
+        submitBtn.disabled = true;
+
+        try {
+            // Note: Sending to a specialized Multipart endpoint in Java
+            const response = await fetch('/api/session/upload-resource', {
+                method: 'POST',
+                body: formData 
+                // Important: Do NOT set Content-Type header when using FormData. 
+                // The browser needs to auto-set it with the boundary string.
+            });
+
+            if (response.ok) {
+                // REAL-TIME UI UPDATE: Prepend the new point immediately (Optimistic Update)
+                if (pointInput.value) {
+                    const newPoint = document.createElement('div');
+                    newPoint.style.background = 'rgba(255,255,255,0.05)';
+                    newPoint.style.padding = '10px';
+                    newPoint.style.borderRadius = '8px';
+                    newPoint.style.marginBottom = '8px';
+                    newPoint.style.borderLeft = '3px solid var(--accent)';
+                    newPoint.innerHTML = `📌 <b>Point Recorded:</b> ${pointInput.value}`;
+                    
+                    if (keyPointsList.firstChild && keyPointsList.firstChild.nodeType === 3) {
+                        keyPointsList.innerHTML = ''; // Clear placeholder text
+                    }
+                    keyPointsList.prepend(newPoint);
+                }
+                
+                // Reset inputs
+                pointInput.value = '';
+                fileInput.value = '';
+                
+                submitBtn.style.background = '#10b981';
+                submitBtn.textContent = "Data Synced! ✔️";
+            } else {
+                throw new Error("Server rejected upload");
+            }
+        } catch (error) {
+            console.error("Transmission Error:", error);
+            submitBtn.style.background = '#ef4444';
+            submitBtn.textContent = "Sync Failed (Check Java)";
+        } finally {
+            setTimeout(() => {
+                submitBtn.style.background = '';
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }, 3000);
         }
     });
 }
