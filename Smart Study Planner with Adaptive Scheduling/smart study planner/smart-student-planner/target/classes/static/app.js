@@ -13,7 +13,7 @@ const whiteboard = document.getElementById('whiteboard');
 const btnAddTask = document.getElementById('btnAddTask');
 
 if (timetableGrid) {
-    const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+    const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
     
     // Draw the structural bones initially
     const initializeGrid = () => {
@@ -42,13 +42,20 @@ if (timetableGrid) {
             
             initializeGrid(); // Clear to prevent duplicates
             
-            tasks.forEach((task, index) => {
-                // Dynamically spread the tasks across the week's grid randomly for visual flare
-                const day = (index % 7) + 1; 
-                let hourSlot = 8 + (index % 10);
-                hourSlot = hourSlot < 10 ? '0' + hourSlot : '' + hourSlot;
+            tasks.forEach((task) => {
+                // Parse the actual deadline from the database
+                const dt = new Date(task.deadline);
+                
+                // Map JS Day (0=Sun, 1=Mon...) to Grid Day (1=Mon, 2=Tue, ..., 7=Sun)
+                let day = dt.getDay();
+                if (day === 0) day = 7; 
+                
+                // Map Hour to 2-digit string (e.g. 08, 14)
+                let hour = dt.getHours();
+                const hourSlot = hour < 10 ? '0' + hour : '' + hour;
                 
                 const targetCell = document.getElementById(`cell-${hourSlot}-${day}`);
+                
                 if(targetCell) {
                     const highPriority = task.priorityScore >= 70;
                     const card = document.createElement('div');
