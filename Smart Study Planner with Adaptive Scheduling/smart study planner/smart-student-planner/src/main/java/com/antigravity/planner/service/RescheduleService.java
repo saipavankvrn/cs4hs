@@ -1,9 +1,6 @@
 package com.antigravity.planner.service;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.LocalDateTime;
 
 public class RescheduleService {
@@ -15,92 +12,113 @@ public class RescheduleService {
     }
 
     /**
-     * Resolves the state when a task is marked as "MISSED".
-     *
-     * @param scheduleId The ID of the missed schedule slot.
-     * @param taskId     The ID of the task itself.
-     * @param userId     The ID of the user owning the task.
+     * Entry point for adaptive rescheduling when a session is missed.
      */
     public void processMissedTask(long scheduleId, long taskId, long userId) throws SQLException {
-        // Increment the missed_count for the task
-        int missedCount = incrementMissedCount(taskId);
+        // Increment missed count
+        updateMissedCount(taskId);
 
-        if (missedCount >= 2) {
-            System.out.println("⚠️ Task missed >= 2 times! Engaging fail-safe: Splitting task.");
-            splitAndRescheduleTask(taskId, userId);
+        // 1. Scan for the next optimal free slot within 48 hours
+        LocalDateTime optimalSlot = findOptimalSlotIn48Hours(userId, taskId);
+
+        if (optimalSlot != null) {
+            updateScheduleSlot(scheduleId, optimalSlot, "Adaptive 48h Free Scan Success");
+            logDecision(taskId, userId, null, optimalSlot, "Optimization success: found free gap in next 2 days.", "{}");
         } else {
-            System.out.println("⚠️ Task missed. Performing standard push-back.");
-            // standard schedule bump handling
+            // 2. Overload Protection: No free slots exist, replace lowest priority task
+            replaceLowestPriorityForHighPriority(userId, taskId, scheduleId);
         }
     }
 
-    private int incrementMissedCount(long taskId) throws SQLException {
-        String updateTask = "UPDATE Tasks SET missed_count = missed_count + 1 WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(updateTask)) {
+    private LocalDateTime findOptimalSlotIn48Hours(long userId, long taskId) throws SQLException {
+        LocalDateTime scanPointer = LocalDateTime.now().plusHours(1).withMinute(0);
+        LocalDateTime scanLimit = LocalDateTime.now().plusHours(48);
+
+        while (scanPointer.isBefore(scanLimit)) {
+            if (isSlotFree(userId, scanPointer) && passesSubjectConstraint(userId, taskId, scanPointer)) {
+                return scanPointer;
+            }
+            scanPointer = scanPointer.plusMinutes(45); // Assuming 30m session + 15m buffer
+        }
+        return null;
+    }
+
+    private void replaceLowestPriorityForHighPriority(long userId, long missedTaskId, long missedScheduleId) throws SQLException {
+        // Find task in next 48h with lowest priority score
+        String lowestSql = "SELECT s.id, s.start_time, t.priority_score, t.title FROM Schedule s " +
+                           "JOIN Tasks t ON s.task_id = t.id WHERE s.user_id = ? AND s.start_time > NOW() " +
+                           "ORDER BY t.priority_score ASC LIMIT 1";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(lowestSql)) {
+            pstmt.setLong(1, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    LocalDateTime targetTime = rs.getObject("start_time", LocalDateTime.class);
+                    
+                    // Replace the low priority session with the current high priority one
+                    updateScheduleSlot(missedScheduleId, targetTime, "Overload Protection: Replaced low-priority task");
+                    logDecision(missedTaskId, userId, null, targetTime, "Overload detected. Replaced lowest priority task: " + rs.getString("title"), "{}");
+                    
+                    // Note: In a real system, we'd also reschedule the replaced task (Cascade Rescheduling)
+                }
+            }
+        }
+    }
+
+    private boolean isSlotFree(long userId, LocalDateTime time) throws SQLException {
+        String query = "SELECT COUNT(*) FROM Schedule WHERE user_id = ? AND ? BETWEEN start_time AND end_time";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setLong(1, userId);
+            pstmt.setObject(2, time);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 0;
+            }
+        }
+    }
+
+    private boolean passesSubjectConstraint(long userId, long taskId, LocalDateTime time) throws SQLException {
+        // Constraint: No same subject back-to-back
+        String query = "SELECT task_id FROM Schedule WHERE user_id = ? AND end_time = ? - INTERVAL 15 MINUTE";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setLong(1, userId);
+            pstmt.setObject(2, time);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("task_id") != taskId;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void updateScheduleSlot(long scheduleId, LocalDateTime newTime, String reason) throws SQLException {
+        String sql = "UPDATE Schedule SET start_time = ?, end_time = ?, is_completed = FALSE WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setObject(1, newTime);
+            pstmt.setObject(2, newTime.plusMinutes(45));
+            pstmt.setLong(3, scheduleId);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private void updateMissedCount(long taskId) throws SQLException {
+        String sql = "UPDATE Tasks SET missed_count = missed_count + 1 WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setLong(1, taskId);
             pstmt.executeUpdate();
         }
+    }
 
-        String fetchCount = "SELECT missed_count FROM Tasks WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(fetchCount)) {
+    private void logDecision(long taskId, long userId, LocalDateTime oldTime, LocalDateTime newTime, String reason, String factors) throws SQLException {
+        String logSql = "INSERT INTO RescheduleLogs (task_id, user_id, old_time, new_time, reason, factors) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(logSql)) {
             pstmt.setLong(1, taskId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("missed_count");
-                }
-            }
+            pstmt.setLong(2, userId);
+            pstmt.setObject(3, oldTime);
+            pstmt.setObject(4, newTime);
+            pstmt.setString(5, reason);
+            pstmt.setString(6, factors);
+            pstmt.executeUpdate();
         }
-        return 0;
-    }
-
-    private void splitAndRescheduleTask(long taskId, long userId) throws SQLException {
-        // Splitting into TWO smaller sessions
-        for (int i = 0; i < 2; i++) {
-            LocalDateTime newSessionStart = findNextLowPrioritySlot(userId);
-            
-            if (newSessionStart != null) {
-                // Assuming divided sub-session length is 30 mins
-                LocalDateTime newSessionEnd = newSessionStart.plusMinutes(30);
-
-                // Re-insert 2 smaller sessions
-                String insertSQL = "INSERT INTO Schedule (user_id, task_id, start_time, end_time, is_completed) VALUES (?, ?, ?, ?, ?)";
-                try (PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
-                    insertStmt.setLong(1, userId);
-                    insertStmt.setLong(2, taskId);
-                    insertStmt.setObject(3, newSessionStart);
-                    insertStmt.setObject(4, newSessionEnd);
-                    insertStmt.setBoolean(5, false);
-                    insertStmt.executeUpdate();
-                }
-                
-                System.out.println("✅ Re-scheduled smaller session at: " + newSessionStart);
-            }
-        }
-    }
-
-    /**
-     * Searches the MySQL Schedule table to find the next available 'Low Priority' slot.
-     * This logic grabs an empty gap after the user's latest scheduled item, taking into 
-     * account a 15-minute buffer requirement.
-     * 
-     * Alternatively, it can be configured to find existing slots where priority is weak.
-     */
-    private LocalDateTime findNextLowPrioritySlot(long userId) throws SQLException {
-        // We find the latest scheduled slot's end time to append our fail-over blocks
-        String findSlotSQL = "SELECT MAX(end_time) AS latest_end FROM Schedule WHERE user_id = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(findSlotSQL)) {
-            pstmt.setLong(1, userId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next() && rs.getObject("latest_end") != null) {
-                    LocalDateTime latestEnd = rs.getObject("latest_end", LocalDateTime.class);
-                    // Add 15-minute buffer before placing the next slot
-                    return latestEnd.plusMinutes(15);
-                }
-            }
-        }
-        
-        // Fallback: If no slots exist yet, start an hour from right now with a perfect buffer spacing
-        return LocalDateTime.now().plusHours(1).withMinute(15).withSecond(0).withNano(0);
     }
 }

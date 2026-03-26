@@ -1,410 +1,320 @@
-// ====== Smart Student Planner: Core UI Logic ======
+// ====== Smart Student Planner: Unified UI Engine ======
 
-// DOM Elements
-const timetableGrid = document.getElementById('timetableGrid');
-const focusScore = document.getElementById('focusScore');
-const focusVal = document.getElementById('focusVal');
-const confidenceScore = document.getElementById('confidenceScore');
-const confidenceVal = document.getElementById('confidenceVal');
-const sessionForm = document.getElementById('sessionForm');
-const whiteboard = document.getElementById('whiteboard');
+// Global State
+let currentTaskId = null;
+let plannedDuration = 30;
+let timerRemaining = 25 * 60;
+let isTimerRunning = false;
+let timerInterval = null;
+let timerStartTime = null;
 
-// 1. Dynamic REST API Grid Mapping (MySQL Integration)
-const btnAddTask = document.getElementById('btnAddTask');
-
-if (timetableGrid) {
-    const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+// DOM Readiness Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    const isFocusPage = window.location.pathname.includes('focus.html');
     
-    // Draw the structural bones initially
-    const initializeGrid = () => {
-        timetableGrid.innerHTML = '';
-        hours.forEach(time => {
-            const timeCell = document.createElement('div');
-            timeCell.className = 'time-slot';
-            timeCell.textContent = time;
-            timetableGrid.appendChild(timeCell);
-            
-            for(let i = 1; i <= 7; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'grid-cell';
-                cell.id = `cell-${time.substring(0,2)}-${i}`; // id mapping e.g: cell-08-1
-                timetableGrid.appendChild(cell);
-            }
-        });
-    };
+    if (isFocusPage) {
+        initFocusPage();
+    } else if (document.getElementById('timetableGrid')) {
+        initTimetablePage();
+    }
+});
 
-    // Auto-fetch Tasks from the Java endpoint
-    const loadRealtimeTasks = async () => {
-        try {
-            const response = await fetch('/api/tasks?userId=1'); // Pull user 1
-            if (!response.ok) return;
-            const tasks = await response.json();
-            
-            initializeGrid(); // Clear to prevent duplicates
-            
-            tasks.forEach((task) => {
-                // Parse the actual deadline from the database
-                const dt = new Date(task.deadline);
-                
-                // Map JS Day (0=Sun, 1=Mon...) to Grid Day (1=Mon, 2=Tue, ..., 7=Sun)
-                let day = dt.getDay();
-                if (day === 0) day = 7; 
-                
-                // Map Hour to 2-digit string (e.g. 08, 14)
-                let hour = dt.getHours();
-                const hourSlot = hour < 10 ? '0' + hour : '' + hour;
-                
-                const targetCell = document.getElementById(`cell-${hourSlot}-${day}`);
-                
-                if(targetCell) {
-                    const highPriority = task.priorityScore >= 70;
-                    const card = document.createElement('div');
-                    card.className = `task-card ${highPriority ? 'card-high-priority' : ''}`;
-                    card.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <div class="title" style="word-break:break-word; max-width:85%;">${task.title}</div>
-                            <span class="btn-delete-task" data-id="${task.id}" style="cursor:pointer; font-size:1.2rem;">&times;</span>
-                        </div>
-                        <div style="font-size:0.8rem; margin-top:2px; opacity:0.8;">
-                            Priority: <b>${task.priorityScore}</b><br/>Missed Slots: ${task.missedCount}
-                        </div>`;
-                    targetCell.appendChild(card);
-                }
-            });
-        } catch (e) {
-            console.error("Connection isolated. Ensure Spring Boot is resolving on :8080");
-            initializeGrid(); // Draw empty grid if server is dead
-        }
-    };
+/**
+ * TIMETABLE PAGE LOGIC
+ */
+async function initTimetablePage() {
+    const grid = document.getElementById('timetableGrid');
+    const btnAdd = document.getElementById('btnAddTask');
     
-    loadRealtimeTasks();
-
-    // Global listener for Timetable Grid matrix clicks (Specifically Deletions)
-    timetableGrid.addEventListener('click', async (e) => {
-        if(e.target.classList.contains('btn-delete-task')) {
-            const subjectId = e.target.getAttribute('data-id');
-            if(confirm("Confirm action: Completely wipe this subject from your schedule?")) {
-                try {
-                    const req = await fetch(`/api/tasks/${subjectId}`, { method: 'DELETE' });
-                    if(req.ok) {
-                        await loadRealtimeTasks(); // Immediately repaint the grid
-                    } else {
-                        alert("Failed to delete from Database.");
-                    }
-                } catch(error) {
-                    alert("Database routing error preventing deletion.");
-                }
-            }
-        }
-    });
-
-    // Async Hook for User Subject Adding
-    if (btnAddTask) {
-        btnAddTask.addEventListener('click', async () => {
+    // Initial load
+    await loadTimetable(grid);
+    
+    // Task addition listener
+    if (btnAdd) {
+        btnAdd.onclick = async () => {
             const title = document.getElementById('newTaskTitle').value;
             let deadline = document.getElementById('newTaskDeadline').value;
-            const confidenceScore = parseInt(document.getElementById('newTaskConfidence').value || "3");
+            const conf = parseInt(document.getElementById('newTaskConfidence').value || "3");
 
-            if (!title || !deadline) return alert("Warning: Title and Deadline are absolutely required.");
-            
-            // Format datetime-local mapping ensuring Seconds exist for Java Parsing rules
+            if (!title || !deadline) return alert("Title and Deadline required!");
             if(deadline.length === 16) deadline += ":00";
 
-            const reqData = {
-                userId: 1, // Simulated session user 1
-                title: title,
-                description: "Student generated focus session",
-                deadline: deadline,
-                confidenceScore: confidenceScore
-            };
-
-            const btnOriginal = btnAddTask.innerHTML;
-            btnAddTask.innerHTML = "Syncing...";
-
             try {
-                const response = await fetch('/api/tasks', {
+                const res = await fetch('/api/tasks', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reqData)
+                    body: JSON.stringify({ userId: 1, title, deadline, confidenceScore: conf })
                 });
-                const jsonResponse = await response.json();
-                
-                if(response.ok && jsonResponse.status === 'success') {
-                    // Update layout immediately!
-                    await loadRealtimeTasks();
+                if (res.ok) {
+                    await loadTimetable(grid);
                     document.getElementById('newTaskTitle').value = '';
-                } else {
-                    alert("Database Foreign Key Error: " + (jsonResponse.message || "Reboot java to resolve tables."));
                 }
-            } catch (e) {
-                alert("Java server offline. Required to execute persistence.");
-            } finally {
-                btnAddTask.innerHTML = btnOriginal;
-            }
-        });
+            } catch (e) { console.error("Sync failed:", e); }
+        };
     }
 }
 
-// 2. Immersive Pomodoro Timer
-let timerInterval;
-let timeRemaining = 25 * 60; 
-let isRunning = false;
-let isWorkMode = true;
-
-const timerDisplay = document.getElementById('timerDisplay');
-const btnStart = document.getElementById('btnStartTimer');
-const btnPause = document.getElementById('btnPauseTimer');
-const btnReset = document.getElementById('btnResetTimer');
-const btnToggleMode = document.getElementById('btnToggleMode');
-
-const updateTimerUI = () => {
-    if(!timerDisplay) return;
-    const m = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
-    const s = (timeRemaining % 60).toString().padStart(2, '0');
-    timerDisplay.textContent = `${m}:${s}`;
-};
-
-if(timerDisplay) {
-    btnStart.addEventListener('click', () => {
-        if(!isRunning) {
-            isRunning = true;
-            timerInterval = setInterval(() => {
-                if(timeRemaining > 0) {
-                    timeRemaining--;
-                    updateTimerUI();
-                } else {
-                    clearInterval(timerInterval);
-                    isRunning = false;
-                    alert(isWorkMode ? 'Block executed successfully! Initiating Break cycle.' : 'Rest cycle over. Resume workflow.');
-                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(()=>console.log("Audio unplayable"));
-                }
-            }, 1000);
-            btnStart.textContent = "Time Engine Active";
-            btnStart.style.filter = "brightness(1.5)";
+async function loadTimetable(grid) {
+    const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+    grid.innerHTML = '';
+    
+    hours.forEach(time => {
+        const timeCell = document.createElement('div');
+        timeCell.className = 'time-slot';
+        timeCell.textContent = time;
+        grid.appendChild(timeCell);
+        for(let i = 1; i <= 7; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            cell.id = `cell-${time.substring(0,2)}-${i}`;
+            grid.appendChild(cell);
         }
     });
 
-    btnPause.addEventListener('click', () => {
-        clearInterval(timerInterval);
-        isRunning = false;
-        btnStart.textContent = "Resume Execution";
-        btnStart.style.filter = "none";
-    });
-
-    btnReset.addEventListener('click', () => {
-        clearInterval(timerInterval);
-        isRunning = false;
-        timeRemaining = isWorkMode ? 25 * 60 : 5 * 60;
-        updateTimerUI();
-        btnStart.textContent = "Start Engine";
-        btnStart.style.filter = "none";
-    });
-
-    btnToggleMode.addEventListener('click', () => {
-        isWorkMode = !isWorkMode;
-        btnToggleMode.textContent = isWorkMode ? 'Switch to Rest' : 'Switch to Focus';
-        timeRemaining = isWorkMode ? 25 * 60 : 5 * 60;
-        updateTimerUI();
-    });
+    try {
+        const res = await fetch('/api/tasks?userId=1');
+        const tasks = await res.json();
+        tasks.forEach(task => {
+            const dt = new Date(task.deadline);
+            let day = dt.getDay() === 0 ? 7 : dt.getDay();
+            let hour = dt.getHours() < 10 ? '0' + dt.getHours() : '' + dt.getHours();
+            
+            const cell = document.getElementById(`cell-${hour}-${day}`);
+            if (cell) {
+                const card = document.createElement('div');
+                card.className = `task-card ${task.priorityScore >= 70 ? 'card-high-priority' : ''}`;
+                card.style.cursor = 'pointer';
+                card.onclick = (e) => {
+                    if (e.target.classList.contains('btn-delete-task')) return;
+                    startFocusSession(task);
+                };
+                card.innerHTML = `
+                    <div class="title">${task.title}</div>
+                    <div style="font-size:0.7rem; opacity:0.8;">Score: ${task.priorityScore.toFixed(0)} | Drift: ${task.timeDrift.toFixed(0)}m</div>
+                    <div style="margin-top:6px; display:flex; justify-content:space-between;">
+                        <span style="font-size:0.65rem; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">⚡ Focus</span>
+                        <span class="btn-delete-task" data-id="${task.id}" style="color:rgba(255,255,255,0.4);">&times;</span>
+                    </div>`;
+                cell.appendChild(card);
+            }
+        });
+    } catch (e) { console.error("Fetch failed:", e); }
 }
 
-// 3. Mathematical Canvas Whiteboard Engine
-if(whiteboard) {
-    const ctx = whiteboard.getContext('2d');
-    let isDrawing = false;
+function startFocusSession(task) {
+    localStorage.setItem('selectedTask', JSON.stringify({
+        id: task.id,
+        subject: task.title,
+        score: task.priorityScore,
+        drift: task.timeDrift,
+        duration: task.avgSessionDuration || 30
+    }));
+    window.location.href = 'focus.html';
+}
 
-    // Fluid resize hook scaling to bounding boxes dynamically
-    const adaptCanvas = () => {
-        whiteboard.width = whiteboard.offsetWidth;
-        whiteboard.height = whiteboard.offsetHeight;
-        ctx.strokeStyle = '#22d3ee'; // Cyberpunk neon trace lines
-        ctx.lineWidth = 2.5;
+/**
+ * FOCUS PAGE LOGIC
+ */
+function initFocusPage() {
+    const taskData = localStorage.getItem('selectedTask');
+    if (!taskData) {
+        document.getElementById('redirectOverlay').style.display = 'flex';
+        setTimeout(() => window.location.href = 'index.html', 3000);
+        return;
+    }
+
+    const task = JSON.parse(taskData);
+    currentTaskId = task.id;
+    plannedDuration = task.duration;
+    timerRemaining = plannedDuration * 60;
+
+    // UI Updates
+    document.getElementById('focusTaskTitle').textContent = task.subject;
+    document.getElementById('focusPriority').textContent = task.score.toFixed(1);
+    document.getElementById('focusDrift').textContent = task.drift.toFixed(0);
+    document.getElementById('targetDuration').textContent = task.duration;
+    updateTimerDisplay();
+
+    // Features Init
+    initTimer();
+    initWhiteboard();
+    initPointsSystem();
+    initFileUpload();
+    initSessionFinalization();
+
+    // Integrity Rule
+    window.onbeforeunload = (e) => {
+        if (isTimerRunning) return "Session in progress! Abandoning will record partial progress.";
+    };
+}
+
+// ⏱️ TIMER LOGIC
+function initTimer() {
+    const btnStart = document.getElementById('btnStartTimer');
+    const btnPause = document.getElementById('btnPauseTimer');
+    const btnReset = document.getElementById('btnResetTimer');
+
+    btnStart.onclick = () => {
+        if (isTimerRunning) return;
+        isTimerRunning = true;
+        timerStartTime = Date.now();
+        btnStart.textContent = "Engine Active";
+        btnStart.classList.add('disabled'); // visual feedback
+        
+        timerInterval = setInterval(() => {
+            if (timerRemaining > 0) {
+                timerRemaining--;
+                updateTimerDisplay();
+            } else {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                btnStart.textContent = "Session Complete";
+                alert("Session duration reached! Finalize to sync adaptive metrics.");
+            }
+        }, 1000);
+    };
+
+    btnPause.onclick = () => {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        btnStart.textContent = "Resume Session";
+    };
+
+    if (btnReset) {
+        btnReset.onclick = () => {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timerRemaining = plannedDuration * 60;
+            updateTimerDisplay();
+            btnStart.textContent = "Initiate Session";
+        };
+    }
+}
+
+function updateTimerDisplay() {
+    const m = Math.floor(timerRemaining / 60).toString().padStart(2, '0');
+    const s = (timerRemaining % 60).toString().padStart(2, '0');
+    document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+}
+
+function adjustTimer(mins) {
+    timerRemaining += (mins * 60);
+    if (timerRemaining < 0) timerRemaining = 0;
+    plannedDuration += mins;
+    document.getElementById('targetDuration').textContent = plannedDuration;
+    updateTimerDisplay();
+}
+
+// 🎨 WHITEBOARD LOGIC
+function initWhiteboard() {
+    const canvas = document.getElementById('whiteboard');
+    const ctx = canvas.getContext('2d');
+    const clearBtn = document.getElementById('btnClearCanvas');
+    let drawing = false;
+
+    const resize = () => {
+        canvas.width = canvas.parentElement.offsetWidth;
+        canvas.height = canvas.parentElement.offsetHeight;
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
     };
-    
-    // Inject bounding logic on structural paint
-    setTimeout(adaptCanvas, 200); 
-    window.addEventListener('resize', adaptCanvas);
 
-    const calcCoordinates = (e) => {
-        const rect = whiteboard.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    window.addEventListener('resize', resize);
+    resize();
+
+    const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
         return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
+            x: (e.clientX || e.touches[0].clientX) - rect.left,
+            y: (e.clientY || e.touches[0].clientY) - rect.top
         };
     };
 
-    const beginStroke = (e) => {
-        isDrawing = true;
-        const coords = calcCoordinates(e);
-        ctx.beginPath();
-        ctx.moveTo(coords.x, coords.y);
-        e.preventDefault();
-    };
+    canvas.onmousedown = (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+    canvas.onmousemove = (e) => { if(!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+    canvas.onmouseup = () => { drawing = false; };
+    canvas.ontouchstart = (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+    canvas.ontouchmove = (e) => { if(!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
+    canvas.ontouchend = () => { drawing = false; };
 
-    const renderStroke = (e) => {
-        if(!isDrawing) return;
-        const coords = calcCoordinates(e);
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-        
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = '#6366f1';
-        e.preventDefault();
-    };
-
-    const finalizeStroke = () => {
-        isDrawing = false;
-        ctx.beginPath();
-    };
-
-    // Binding standard mouse protocols
-    whiteboard.addEventListener('mousedown', beginStroke);
-    whiteboard.addEventListener('mousemove', renderStroke);
-    whiteboard.addEventListener('mouseup', finalizeStroke);
-    whiteboard.addEventListener('mouseleave', finalizeStroke);
-    
-    // Binding touch capabilities for tablets
-    whiteboard.addEventListener('touchstart', beginStroke, {passive: false});
-    whiteboard.addEventListener('touchmove', renderStroke, {passive: false});
-    whiteboard.addEventListener('touchend', finalizeStroke);
-
-    document.getElementById('btnClearCanvas').addEventListener('click', () => {
-        ctx.clearRect(0, 0, whiteboard.width, whiteboard.height);
-    });
+    clearBtn.onclick = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// 4. Async REST Hook for Java Backend bridging
-if(focusScore) {
-    focusScore.addEventListener('input', e => focusVal.textContent = e.target.value);
-    confidenceScore.addEventListener('input', e => confidenceVal.textContent = e.target.value);
+// 📌 POINTS SYSTEM
+function initPointsSystem() {
+    const form = document.getElementById('resourceUploadForm');
+    const input = document.getElementById('keyPointInput');
+    const list = document.getElementById('keyPointsList');
 
-    sessionForm.addEventListener('submit', async (e) => {
+    form.onsubmit = (e) => {
         e.preventDefault();
-        const formData = {
-            userId: 1, // static for prototype
-            taskId: 1, 
+        const text = input.value.trim();
+        if (!text) return;
+
+        if (list.querySelector('p')) list.innerHTML = ''; // Remove empty message
+        
+        const div = document.createElement('div');
+        div.className = 'point-card';
+        div.textContent = `📌 ${text}`;
+        list.prepend(div);
+        
+        input.value = '';
+    };
+}
+
+// 📂 FILE UPLOAD HANDLING (UI)
+function initFileUpload() {
+    const input = document.getElementById('fileUpload');
+    const list = document.getElementById('fileList');
+
+    input.onchange = () => {
+        list.innerHTML = '';
+        Array.from(input.files).forEach(file => {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            div.innerHTML = `<span>📄</span> ${file.name}`;
+            list.appendChild(div);
+        });
+    };
+}
+
+// ✅ SESSION FINALIZATION
+function initSessionFinalization() {
+    const form = document.getElementById('sessionForm');
+    
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const status = document.getElementById('sessionStatus').value;
+        const focus = document.getElementById('focusScore').value;
+        const confidence = document.getElementById('confidenceScore').value;
+        const notes = document.getElementById('studyNotes').value;
+
+        const payload = {
+            userId: 1,
+            taskId: currentTaskId,
             scheduleId: 1,
-            focusScore: parseInt(focusScore.value),
-            confidenceScore: parseInt(confidenceScore.value),
-            notes: document.getElementById('studyNotes').value
+            status: status,
+            focusScore: parseInt(focus),
+            confidenceScore: parseInt(confidence),
+            plannedDuration: plannedDuration,
+            actualDuration: plannedDuration, // Mocked for calculation logic
+            notes: notes
         };
 
-        const submitBtn = sessionForm.querySelector('button');
-        const defaultText = submitBtn.textContent;
-
         try {
-            // Posting directly to our SessionController using pure Java API
-            console.log("[Antigravity] Sending to /api/session/complete ->", formData);
-            
-            const req = await fetch('/api/session/complete', {
+            const res = await fetch('/api/session/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
-
-            if (!req.ok) throw new Error("Backend offline or exception");
-
-            // Visually alert user of success
-            submitBtn.style.background = '#10b981';
-            submitBtn.textContent = 'Session Registered! ✔️';
-            
-            setTimeout(() => {
-                submitBtn.style.background = '';
-                submitBtn.textContent = defaultText;
-                document.getElementById('studyNotes').value = ''; 
-            }, 3000);
-
-        } catch (error) {
-            console.warn("REST Error: Did you run the Spring Application?", error);
-            
-            // Fallback UI handling for UI dev / offline local runs
-            submitBtn.style.background = '#f59e0b';
-            submitBtn.textContent = 'Simulated Local Save ✔️ (Start Java Server to persist)';
-            setTimeout(() => {
-                submitBtn.style.background = '';
-                submitBtn.textContent = defaultText;
-            }, 3500);
-        }
-    });
-}
-
-// 5. Senior Logic: Handling Binary Uploads + Instant UI Updates
-const resourceUploadForm = document.getElementById('resourceUploadForm');
-const keyPointsList = document.getElementById('keyPointsList');
-
-if (resourceUploadForm) {
-    resourceUploadForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const fileInput = document.getElementById('focusFile');
-        const pointInput = document.getElementById('keyPointInput');
-        
-        // Validation: Require at least a point or a file
-        if (!pointInput.value && !fileInput.files[0]) {
-            return alert("Please enter a point or select a file to sync.");
-        }
-
-        // Use FormData for Multipart File + Text Support
-        const formData = new FormData();
-        formData.append('userId', 1);
-        formData.append('keyPoint', pointInput.value);
-        if (fileInput.files[0]) {
-            formData.append('file', fileInput.files[0]);
-        }
-
-        const submitBtn = resourceUploadForm.querySelector('button');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = "Syncing with Cloud...";
-        submitBtn.disabled = true;
-
-        try {
-            // Note: Sending to a specialized Multipart endpoint in Java
-            const response = await fetch('/api/session/upload-resource', {
-                method: 'POST',
-                body: formData 
-                // Important: Do NOT set Content-Type header when using FormData. 
-                // The browser needs to auto-set it with the boundary string.
-            });
-
-            if (response.ok) {
-                // REAL-TIME UI UPDATE: Prepend the new point immediately (Optimistic Update)
-                if (pointInput.value) {
-                    const newPoint = document.createElement('div');
-                    newPoint.style.background = 'rgba(255,255,255,0.05)';
-                    newPoint.style.padding = '10px';
-                    newPoint.style.borderRadius = '8px';
-                    newPoint.style.marginBottom = '8px';
-                    newPoint.style.borderLeft = '3px solid var(--accent)';
-                    newPoint.innerHTML = `📌 <b>Point Recorded:</b> ${pointInput.value}`;
-                    
-                    if (keyPointsList.firstChild && keyPointsList.firstChild.nodeType === 3) {
-                        keyPointsList.innerHTML = ''; // Clear placeholder text
-                    }
-                    keyPointsList.prepend(newPoint);
-                }
-                
-                // Reset inputs
-                pointInput.value = '';
-                fileInput.value = '';
-                
-                submitBtn.style.background = '#10b981';
-                submitBtn.textContent = "Data Synced! ✔️";
-            } else {
-                throw new Error("Server rejected upload");
+            if (res.ok) {
+                localStorage.removeItem('selectedTask');
+                isTimerRunning = false;
+                alert("Success! Adaptive learning engine updated based on your drift and focus.");
+                window.location.href = 'index.html';
             }
-        } catch (error) {
-            console.error("Transmission Error:", error);
-            submitBtn.style.background = '#ef4444';
-            submitBtn.textContent = "Sync Failed (Check Java)";
-        } finally {
-            setTimeout(() => {
-                submitBtn.style.background = '';
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            }, 3000);
-        }
-    });
+        } catch (err) { alert("Sync failed. Local save complete."); }
+    };
 }

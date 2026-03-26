@@ -1,94 +1,414 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Mode | Deep Work</title>
+    <title>Focus Mode | Deep Work Engine</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --accent: #22d3ee;
+            --accent-glow: rgba(34, 211, 238, 0.3);
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 1. Global Scrolling & Scrollbar Fix */
+        body {
+            height: 100vh;
+            margin: 0;
+            overflow-y: auto; /* Allow global scroll if content exceeds */
+            background: #0f172a;
+            font-family: 'Outfit', sans-serif;
+            color: white;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 10px;
+        }
+
+        .focus-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 4. Header Section Redesign */
+        .premium-header {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header-left .subject-badge {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+        .header-left .metrics {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .header-center {
+            text-align: center;
+        }
+        .timer-display {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--accent);
+            text-shadow: 0 0 30px var(--accent-glow);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        /* 5. Button Grouping */
+        .timer-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .adjustment-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* 2. Responsive Grid Layout */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 24px;
+            min-height: 700px;
+        }
+
+        /* Tablet Layout (<= 1024px) */
+        @media (max-width: 1024px) {
+            .workspace-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .grid-panel:nth-child(2) { /* Practice Board */
+                grid-column: span 2;
+                order: -1; /* Move board to top if preferred, or keep as requested */
+                height: 500px;
+            }
+            .premium-header {
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+            .header-center {
+                grid-column: span 2;
+                order: 3;
+            }
+        }
+
+        /* Mobile Layout (<= 768px) */
+        @media (max-width: 768px) {
+            .workspace-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            .grid-panel:nth-child(2) {
+                grid-column: span 1;
+                height: 400px;
+            }
+            .premium-header {
+                display: flex;
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+            .header-left, .header-right {
+                align-items: center;
+                text-align: center;
+            }
+            .timer-display {
+                font-size: 3rem;
+            }
+            .focus-container {
+                padding: 10px;
+            }
+        }
+
+        /* 7. Section Height Control */
+        .grid-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            min-height: 350px;
+        }
+
+        .panel-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 15px;
+            padding-right: 10px;
+        }
+
+        /* 3. Practice Board Improvements */
+        .board-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .board-container {
+            flex: 1;
+            position: relative;
+            background-color: #020617;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            border-radius: 16px;
+            border: 2px solid rgba(var(--accent-rgb), 0.2);
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        #whiteboard {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        /* 6. Resources & Points Improvement */
+        .point-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            cursor: default;
+        }
+        .point-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(4px);
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(34, 211, 238, 0.1);
+            color: var(--accent);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        /* Button Styling */
+        .btn-premium {
+            background: var(--accent);
+            color: black;
+            font-weight: 700;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn-premium:disabled, .btn-premium.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            color: white;
+            font-family: inherit;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        #redirectOverlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-dark);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
 </head>
+<body class="dark-theme">
 
-<body class="dark-theme focus-layout">
+    <div id="redirectOverlay">
+        <div style="font-size: 4rem; margin-bottom: 20px;">🔒</div>
+        <h2 style="font-size: 2rem;">No Study Subject Selected</h2>
+        <p style="opacity: 0.6;">Redirecting to your timetable mission control...</p>
+    </div>
 
-    <!-- Top HUD Banner -->
-    <header class="focus-header glass-panel">
-        <div class="task-info">
-            <h2 id="focusTaskTitle">Advanced Quantum Mechanics</h2>
-            <p>Priority Score: <span style="color:var(--accent);font-weight:bold;">92.5</span> | Session Block: 1 of 2</p>
-        </div>
+    <div class="focus-container">
         
-        <!-- Interactive 25/5 Pomodoro -->
-        <div class="pomodoro-timer">
-            <div class="timer-display" id="timerDisplay">25:00</div>
-            <div class="timer-controls">
-                <button id="btnStartTimer" class="btn-glow">Start Engine</button>
-                <button id="btnPauseTimer" class="btn-secondary">Pause</button>
-                <button id="btnResetTimer" class="btn-secondary">Reset</button>
-                <button id="btnToggleMode" class="btn-text">Switch to Rest</button>
-            </div>
-        </div>
-        
-        <a href="index.html" class="btn-close">Exit Focus</a>
-    </header>
-
-    <div class="focus-workspace">
-        
-        <!-- Immersive Subject PDF Viewer -->
-        <div class="pdf-panel glass-panel">
-            <h3>Subject Material</h3>
-            <iframe src="about:blank" class="pdf-viewer" id="pdfViewer" title="Reference PDF"></iframe>
-            <div class="pdf-overlay" id="pdfOverlay">Awaiting Document / PDF source injection.</div>
-        </div>
-
-        <div class="tools-panel">
-            
-            <!-- NEW: Real-time Resource & Key Points Tracker -->
-            <div class="glass-panel" style="padding: 20px;">
-                <h3>Real-time Insights</h3>
-                <div id="keyPointsList" style="margin: 10px 0; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-                    <span style="color:var(--text-muted); font-size:0.9rem;">No points recorded yet for this session...</span>
+        <header class="grid-panel premium-header">
+            <div class="header-left">
+                <h1 id="focusTaskTitle" class="subject-badge">Select Subject</h1>
+                <div class="metrics">
+                    <span>Priority Score: <b id="focusPriority" style="color:var(--accent)">--</b></span>
+                    <span>Session Drift: <b id="focusDrift">--</b>m</span>
+                    <span>Target: <b id="targetDuration">--</b>m</span>
                 </div>
-                <form id="resourceUploadForm" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:10px;">
-                    <input type="text" id="keyPointInput" placeholder="Add a key takeaway point..." class="w-100" style="padding:10px; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white; font-family:inherit;">
-                    <input type="file" id="focusFile" style="font-size:0.8rem; color:var(--text-muted);">
-                    <button type="submit" class="btn-glow w-100">Sync Study Assets</button>
-                </form>
             </div>
 
-            <!-- Dynamic HTML5 Canvas Whiteboard -->
-            <div class="whiteboard-container glass-panel">
-                <div class="panel-header">
-                    <h3>Drafting Pad</h3>
-                    <button class="btn-text" id="btnClearCanvas">Clear Ink</button>
+            <div class="header-center">
+                <div class="timer-display" id="timerDisplay">25:00</div>
+                <div class="adjustment-controls">
+                    <button onclick="adjustTimer(15)" class="btn-outline">+15m</button>
+                    <button onclick="adjustTimer(5)" class="btn-outline">+5m</button>
+                    <button onclick="adjustTimer(-5)" class="btn-outline">-5m</button>
                 </div>
-                <canvas id="whiteboard"></canvas>
             </div>
 
-            <!-- Pre vs Actual Post-Study Form Tracker -->
-            <div class="post-study-form glass-panel">
-                <h3>Post-Session Analytics</h3>
-                <form id="sessionForm">
-                    <div class="form-group">
-                        <label for="focusScore">Mental Focus Level: <span id="focusVal" style="color:var(--accent)">4</span></label>
-                        <input type="range" id="focusScore" min="1" max="5" value="4">
-                    </div>
-                    <div class="form-group">
-                        <label for="confidenceScore">Confidence in Topic: <span id="confidenceVal" style="color:var(--accent)">3</span></label>
-                        <input type="range" id="confidenceScore" min="1" max="5" value="3">
-                    </div>
-                    <div class="form-group">
-                        <label for="studyNotes">Plan vs. Actual Retrospective</label>
-                        <textarea id="studyNotes" rows="3" placeholder="What blocked you today? What did you master?"></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary w-100">Finalize Session →</button>
-                </form>
+            <div class="header-right">
+                <div class="timer-controls">
+                    <button id="btnResetTimer" class="btn-outline">Reset</button>
+                    <button id="btnPauseTimer" class="btn-outline">Pause</button>
+                    <button id="btnStartTimer" class="btn-premium">Initiate Session</button>
+                </div>
             </div>
+        </header>
+
+        <main class="workspace-grid">
             
-        </div>
+            <!-- Column 1: Resources & Points -->
+            <aside class="grid-panel">
+                <h3 style="margin:0;">Resources & Points</h3>
+                <p style="font-size:0.85rem; opacity:0.5; margin-bottom:20px;">Capture insights and session materials.</p>
+                
+                <form id="resourceUploadForm" style="display:flex; flex-direction:column; gap:12px;">
+                    <input type="text" id="keyPointInput" placeholder="Record a breakthrough..." class="key-input">
+                    <button type="submit" class="btn-outline" style="color:var(--accent); border-color:var(--accent);">📌 Save Point</button>
+                </form>
+
+                <div style="margin-top:24px;">
+                    <button onclick="document.getElementById('fileUpload').click()" class="btn-outline" style="width:100%; border-style:dashed;">📎 Attache References</button>
+                    <input type="file" id="fileUpload" multiple style="display:none;">
+                    <div id="fileList" class="panel-scrollable" style="max-height: 100px;"></div>
+                </div>
+
+                <div id="keyPointsList" class="panel-scrollable">
+                    <p style="opacity:0.2; text-align:center; margin-top:50px;">Your session notes will appear here.</p>
+                </div>
+            </aside>
+
+            <!-- Column 2: Large Practice Board -->
+            <section class="grid-panel">
+                <div class="board-header">
+                    <div>
+                        <h3 style="margin:0;">Active Drafting Zone</h3>
+                        <p style="font-size:0.8rem; opacity:0.5;">Sketch solutions, mind maps, or equations.</p>
+                    </div>
+                    <button id="btnClearCanvas" class="btn-outline" style="border-radius:20px;">Clear Alpha Pad</button>
+                </div>
+                <div class="board-container">
+                    <div style="position:absolute; top:20px; left:20px; font-size:1.5rem; font-weight:800; opacity:0.05; pointer-events:none;">DRAW / PRACTICE HERE</div>
+                    <canvas id="whiteboard"></canvas>
+                </div>
+            </section>
+
+            <!-- Column 3: Adaptive Finalization -->
+            <aside class="grid-panel">
+                <h3 style="margin:0;">Adaptive Finalization</h3>
+                <p style="font-size:0.85rem; opacity:0.5; margin-bottom:20px;">Engine verification and drift analysis.</p>
+                
+                <form id="sessionForm" class="panel-scrollable" style="margin-top:0;">
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div>
+                            <label style="font-size:0.85rem; display:block; margin-bottom:8px;">Operational Status</label>
+                            <select id="sessionStatus">
+                                <option value="COMPLETED">✅ COMPLETED</option>
+                                <option value="PARTIAL">⚠️ PARTIAL</option>
+                                <option value="MISSED">❌ MISSED</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="font-size:0.85rem; display:block; margin-bottom:10px;">Cognitive Load (1-5)</label>
+                            <input type="range" id="focusScore" min="1" max="5" value="4" style="accent-color:var(--accent);">
+                        </div>
+
+                        <div>
+                            <label style="font-size:0.85rem; display:block; margin-bottom:10px;">Subject Confidence (1-5)</label>
+                            <input type="range" id="confidenceScore" min="1" max="5" value="3" style="accent-color:var(--accent);">
+                        </div>
+
+                        <div>
+                            <label style="font-size:0.85rem; display:block; margin-bottom:8px;">Post-Session Review</label>
+                            <textarea id="studyNotes" placeholder="Summary of progress and blockers..." style="height:150px;"></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-premium" style="width:100%; margin-top:24px;">Sync Adaptive Metrics →</button>
+                </form>
+            </aside>
+
+        </main>
     </div>
 
     <script src="app.js"></script>
 </body>
-
 </html>

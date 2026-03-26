@@ -13,7 +13,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
-
     private final DataSource dataSource;
     private final PriorityEngine priorityEngine = new PriorityEngine();
 
@@ -27,13 +26,12 @@ public class TaskController {
         String title = (String) payload.get("title");
         String description = (String) payload.get("description");
         LocalDateTime deadline = LocalDateTime.parse((String) payload.get("deadline"));
-        // Defaulting to 3 if not provided
         int confidence = payload.containsKey("confidenceScore") ? ((Number) payload.get("confidenceScore")).intValue() : 3;
 
-        // Dynamically determining priority based on incoming deadline and confidence logic
-        double priorityScore = priorityEngine.calculatePriority(deadline, 0, confidence);
+        // Adaptive: Initial priority with null lastStudied and 0 drift
+        double priorityScore = priorityEngine.calculatePriority(deadline, 0, confidence, 0.0, null);
 
-        String sql = "INSERT INTO Tasks (user_id, title, description, deadline, priority_score, missed_count) VALUES (?, ?, ?, ?, ?, 0)";
+        String sql = "INSERT INTO Tasks (user_id, title, description, deadline, priority_score, missed_count, time_drift) VALUES (?, ?, ?, ?, ?, 0, 0.0)";
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -73,8 +71,11 @@ public class TaskController {
                     task.put("title", rs.getString("title"));
                     task.put("description", rs.getString("description"));
                     task.put("deadline", rs.getObject("deadline"));
-                    task.put("priorityScore", rs.getInt("priority_score"));
+                    task.put("priorityScore", rs.getDouble("priority_score"));
                     task.put("missedCount", rs.getInt("missed_count"));
+                    task.put("timeDrift", rs.getDouble("time_drift"));
+                    task.put("lastStudied", rs.getObject("last_studied_time"));
+                    task.put("avgDuration", rs.getInt("avg_session_duration"));
                     tasks.add(task);
                 }
             }
@@ -84,28 +85,33 @@ public class TaskController {
         return tasks;
     }
 
-    @PutMapping("/{id}")
-    public Map<String, String> updateTask(@PathVariable("id") long id, @RequestBody Map<String, Object> payload) {
-        String sql = "UPDATE Tasks SET title = ?, description = ?, deadline = ?, priority_score = ? WHERE id = ?";
+    @PostMapping("/recalculate")
+    public Map<String, String> recalculatePriorities(@RequestParam("userId") long userId) {
+        String fetchAll = "SELECT * FROM Tasks WHERE user_id = ?";
+        String updateTask = "UPDATE Tasks SET priority_score = ? WHERE id = ?";
+        
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+             PreparedStatement fetchPstmt = conn.prepareStatement(fetchAll);
+             PreparedStatement updatePstmt = conn.prepareStatement(updateTask)) {
             
-            pstmt.setString(1, (String) payload.get("title"));
-            pstmt.setString(2, (String) payload.get("description"));
-            
-            LocalDateTime deadline = LocalDateTime.parse((String) payload.get("deadline"));
-            pstmt.setObject(3, deadline);
-            
-            // Recalculate priority automatically on task mutation
-            int missedCount = payload.containsKey("missedCount") ? ((Number) payload.get("missedCount")).intValue() : 0;
-            int confidence = payload.containsKey("confidenceScore") ? ((Number) payload.get("confidenceScore")).intValue() : 3;
-            double priorityScore = priorityEngine.calculatePriority(deadline, missedCount, confidence);
-            
-            pstmt.setDouble(4, priorityScore);
-            pstmt.setLong(5, id);
-            pstmt.executeUpdate();
-            
-            return Map.of("status", "success", "newPriorityScore", String.valueOf(priorityScore));
+            fetchPstmt.setLong(1, userId);
+            try (ResultSet rs = fetchPstmt.executeQuery()) {
+                while (rs.next()) {
+                    long id = rs.getLong("id");
+                    LocalDateTime deadline = rs.getObject("deadline", LocalDateTime.class);
+                    int missed = rs.getInt("missed_count");
+                    double drift = rs.getDouble("time_drift");
+                    LocalDateTime lastStudied = rs.getObject("last_studied_time", LocalDateTime.class);
+                    
+                    // Confidence is 3 by default for batch recalc
+                    double newScore = priorityEngine.calculatePriority(deadline, missed, 3, drift, lastStudied);
+                    
+                    updatePstmt.setDouble(1, newScore);
+                    updatePstmt.setLong(2, id);
+                    updatePstmt.executeUpdate();
+                }
+            }
+            return Map.of("status", "success", "message", "Adaptive priorities refreshed.");
         } catch (SQLException e) {
             e.printStackTrace();
             return Map.of("status", "error", "message", e.getMessage());
@@ -113,16 +119,14 @@ public class TaskController {
     }
 
     @DeleteMapping("/{id}")
-    public Map<String, String> deleteTask(@PathVariable("id") long id) {
+    public Map<String, String> deleteTask(@PathVariable long id) {
         String sql = "DELETE FROM Tasks WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             pstmt.setLong(1, id);
             pstmt.executeUpdate();
             return Map.of("status", "success");
         } catch (SQLException e) {
-            e.printStackTrace();
             return Map.of("status", "error", "message", e.getMessage());
         }
     }
