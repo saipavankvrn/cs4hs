@@ -90,7 +90,7 @@ async function loadTimetable(grid) {
                 };
                 card.innerHTML = `
                     <div class="title">${task.title}</div>
-                    <div style="font-size:0.7rem; opacity:0.8;">Score: ${task.priorityScore.toFixed(0)} | Drift: ${task.timeDrift.toFixed(0)}m</div>
+                    <div style="font-size:0.7rem; opacity:0.8;">Score: ${task.priorityScore.toFixed(0)} | Drift: ${(task.timeDrift || 0).toFixed(0)}m</div>
                     <div style="margin-top:6px; display:flex; justify-content:space-between;">
                         <span style="font-size:0.65rem; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">⚡ Focus</span>
                         <span class="btn-delete-task" data-id="${task.id}" style="color:rgba(255,255,255,0.4);">&times;</span>
@@ -104,9 +104,10 @@ async function loadTimetable(grid) {
 function startFocusSession(task) {
     localStorage.setItem('selectedTask', JSON.stringify({
         id: task.id,
+        scheduleId: task.scheduleId || 1, // Correctly pass scheduleId from DB
         subject: task.title,
         score: task.priorityScore,
-        drift: task.timeDrift,
+        drift: task.timeDrift || 0,
         duration: task.avgSessionDuration || 30
     }));
     window.location.href = 'focus.html';
@@ -286,20 +287,26 @@ function initSessionFinalization() {
     
     form.onsubmit = async (e) => {
         e.preventDefault();
+        const taskData = JSON.parse(localStorage.getItem('selectedTask'));
         const status = document.getElementById('sessionStatus').value;
         const focus = document.getElementById('focusScore').value;
         const confidence = document.getElementById('confidenceScore').value;
         const notes = document.getElementById('studyNotes').value;
 
+        // Calculate actual duration based on time elapsed in timer
+        const actualDuration = timerStartTime 
+            ? Math.round((Date.now() - timerStartTime) / 60000) 
+            : plannedDuration;
+
         const payload = {
             userId: 1,
             taskId: currentTaskId,
-            scheduleId: 1,
+            scheduleId: taskData.scheduleId,
             status: status,
             focusScore: parseInt(focus),
             confidenceScore: parseInt(confidence),
             plannedDuration: plannedDuration,
-            actualDuration: plannedDuration, // Mocked for calculation logic
+            actualDuration: actualDuration,
             notes: notes
         };
 

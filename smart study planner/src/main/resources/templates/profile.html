@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Study - User Profile</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="logo">
+            <i class="fas fa-graduation-cap"></i> Smart Study
+        </div>
+        <ul class="nav-links">
+            <li><a href="/"><i class="fas fa-th-large"></i> Dashboard</a></li>
+            <li><a href="/documents"><i class="fas fa-file-alt"></i> Documents</a></li>
+            <li><a href="/subjects"><i class="fas fa-book"></i> Subjects</a></li>
+            <li><a href="/profile" class="active"><i class="fas fa-user-circle"></i> Profile</a></li>
+            <li style="margin-top: auto;"><a href="/logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1>Your Profile</h1>
+                <p style="color: var(--text-muted); margin-top: 5px;">Manage your student account settings</p>
+            </div>
+        </header>
+
+        <div class="dashboard-section" style="max-width: 800px;">
+            <div style="display: flex; align-items: center; gap: 30px; margin-bottom: 2rem; border-bottom: 1px solid #f1f2f6; padding-bottom: 2rem;">
+                <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div>
+                    <h2 th:text="${user.username}" style="color: var(--text-main); font-size: 2rem;">Student Name</h2>
+                    <p th:text="${user.email}" style="color: var(--text-muted); font-size: 1.1rem;">student@email.com</p>
+                    <span style="background: var(--secondary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; margin-top: 10px; display: inline-block;">
+                        STUDENT ACCOUNT
+                    </span>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: #f9f9fb; padding: 1.5rem; border-radius: 12px;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fas fa-info-circle" style="color: var(--primary)"></i> Account Info</h3>
+                    <p style="margin-bottom: 10px;"><strong>Username:</strong> <span th:text="${user.username}"></span></p>
+                    <p style="margin-bottom: 10px;"><strong>Email:</strong> <span th:text="${user.email}"></span></p>
+                    <p style="margin-bottom: 10px;"><strong>Joined:</strong> <span th:text="${#temporals.format(user.createdAt, 'dd MMMM yyyy')}"></span></p>
+                </div>
+                
+                <div style="background: #f9f9fb; padding: 1.5rem; border-radius: 12px;">
+                    <h3 style="margin-bottom: 1rem;"><i class="fas fa-chart-line" style="color: var(--secondary)"></i> Stats</h3>
+                    <p style="margin-bottom: 10px;"><strong>Subjects:</strong> <span th:text="${#lists.size(user.subjects)}">0</span></p>
+                    <p style="margin-bottom: 10px;"><strong>Documents:</strong> <span th:text="${#lists.size(user.documents)}">0</span></p>
+                    <p style="margin-bottom: 10px;"><strong>Notes/Cards:</strong> <span th:text="${#lists.size(user.studyCards)}">0</span></p>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem; display: flex; gap: 10px;">
+                <button class="btn">Update Profile</button>
+                <button class="btn" style="background: #dfe6e9; color: #2d3436;">Change Password</button>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

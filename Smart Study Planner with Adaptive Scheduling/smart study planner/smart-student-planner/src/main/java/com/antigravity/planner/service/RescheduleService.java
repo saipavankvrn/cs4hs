@@ -18,6 +18,9 @@ public class RescheduleService {
         // Increment missed count
         updateMissedCount(taskId);
 
+        // Fetch current priority to determine if replacement is worth it
+        double missedTaskScore = getTaskPriority(taskId);
+
         // 1. Scan for the next optimal free slot within 48 hours
         LocalDateTime optimalSlot = findOptimalSlotIn48Hours(userId, taskId);
 
@@ -25,8 +28,8 @@ public class RescheduleService {
             updateScheduleSlot(scheduleId, optimalSlot, "Adaptive 48h Free Scan Success");
             logDecision(taskId, userId, null, optimalSlot, "Optimization success: found free gap in next 2 days.", "{}");
         } else {
-            // 2. Overload Protection: No free slots exist, replace lowest priority task
-            replaceLowestPriorityForHighPriority(userId, taskId, scheduleId);
+            // 2. Overload Protection: No free slots exist, replace lowest priority task (if threshold met)
+            replaceLowestPriorityForHighPriority(userId, taskId, scheduleId, missedTaskScore);
         }
     }
 
@@ -35,7 +38,7 @@ public class RescheduleService {
         LocalDateTime scanLimit = LocalDateTime.now().plusHours(48);
 
         while (scanPointer.isBefore(scanLimit)) {
-            if (isSlotFree(userId, scanPointer) && passesSubjectConstraint(userId, taskId, scanPointer)) {
+            if (isSlotFree(userId, scanPointer, 45) && passesSubjectConstraint(userId, taskId, scanPointer)) {
                 return scanPointer;
             }
             scanPointer = scanPointer.plusMinutes(45); // Assuming 30m session + 15m buffer
@@ -43,14 +46,16 @@ public class RescheduleService {
         return null;
     }
 
-    private void replaceLowestPriorityForHighPriority(long userId, long missedTaskId, long missedScheduleId) throws SQLException {
-        // Find task in next 48h with lowest priority score
+    private void replaceLowestPriorityForHighPriority(long userId, long missedTaskId, long missedScheduleId, double missedTaskScore) throws SQLException {
+        // Find task in next 48h with lowest priority score, and check if it's significantly lower
         String lowestSql = "SELECT s.id, s.start_time, t.priority_score, t.title FROM Schedule s " +
                            "JOIN Tasks t ON s.task_id = t.id WHERE s.user_id = ? AND s.start_time > NOW() " +
+                           "AND t.priority_score < (? - 20) " + // Senior Rule: Only replace if gap is significant
                            "ORDER BY t.priority_score ASC LIMIT 1";
 
         try (PreparedStatement pstmt = connection.prepareStatement(lowestSql)) {
             pstmt.setLong(1, userId);
+            pstmt.setDouble(2, missedTaskScore);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     LocalDateTime targetTime = rs.getObject("start_time", LocalDateTime.class);
@@ -58,20 +63,32 @@ public class RescheduleService {
                     // Replace the low priority session with the current high priority one
                     updateScheduleSlot(missedScheduleId, targetTime, "Overload Protection: Replaced low-priority task");
                     logDecision(missedTaskId, userId, null, targetTime, "Overload detected. Replaced lowest priority task: " + rs.getString("title"), "{}");
-                    
-                    // Note: In a real system, we'd also reschedule the replaced task (Cascade Rescheduling)
                 }
             }
         }
     }
 
-    private boolean isSlotFree(long userId, LocalDateTime time) throws SQLException {
-        String query = "SELECT COUNT(*) FROM Schedule WHERE user_id = ? AND ? BETWEEN start_time AND end_time";
+    private boolean isSlotFree(long userId, LocalDateTime start, int durationMins) throws SQLException {
+        LocalDateTime end = start.plusMinutes(durationMins);
+        // Strict overlap protection: Check if ANY existing session exists within the new [start, end] window
+        String query = "SELECT COUNT(*) FROM Schedule WHERE user_id = ? " +
+                       "AND NOT (end_time <= ? OR start_time >= ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setLong(1, userId);
-            pstmt.setObject(2, time);
+            pstmt.setObject(2, start);
+            pstmt.setObject(3, end);
             try (ResultSet rs = pstmt.executeQuery()) {
                 return rs.next() && rs.getInt(1) == 0;
+            }
+        }
+    }
+
+    private double getTaskPriority(long taskId) throws SQLException {
+        String sql = "SELECT priority_score FROM Tasks WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setLong(1, taskId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() ? rs.getDouble(1) : 0.0;
             }
         }
     }

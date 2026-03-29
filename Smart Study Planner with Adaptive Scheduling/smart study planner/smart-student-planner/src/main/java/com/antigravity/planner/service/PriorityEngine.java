@@ -20,6 +20,10 @@ public class PriorityEngine {
      */
     public double calculatePriority(LocalDateTime deadline, int missedCount, int confidence, double drift, LocalDateTime lastStudied) {
         int boundedConfidence = Math.max(1, Math.min(5, confidence));
+        
+        // Normalize missedCount weight to prevent runaway scores (cap at 5 misses for calculation)
+        double missedWeight = Math.min(5, missedCount) * 10.0;
+        
         long hoursRemaining = ChronoUnit.HOURS.between(LocalDateTime.now(), deadline);
         double deadlineWeight = getDeadlineWeight(hoursRemaining);
 
@@ -27,15 +31,18 @@ public class PriorityEngine {
         double timeDecay = 0;
         if (lastStudied != null) {
             long daysSinceStudy = ChronoUnit.DAYS.between(lastStudied, LocalDateTime.now());
-            timeDecay = Math.min(30.0, daysSinceStudy * 2.5); // Max 30 points for 'Starvation'
+            timeDecay = Math.min(25.0, daysSinceStudy * 2.5); // Max 25 points for 'Starvation'
         }
 
         // Drift Sensitivity: High positive drift means user takes LONGER than planned
         // We increase priority to ensure these 'Heavy' tasks get earlier slots
-        double driftFactor = Math.abs(drift) * 0.4;
+        double driftFactor = (drift > 0) ? drift * 0.5 : 0;
 
         // Core Rule-Based Score
-        return (deadlineWeight * 1.5) + (missedCount * 10.0) + ((5 - boundedConfidence) * 8.0) + timeDecay + driftFactor;
+        double finalScore = (deadlineWeight * 1.5) + missedWeight + ((5 - boundedConfidence) * 8.0) + timeDecay + driftFactor;
+        
+        // Hard clamp to prevent system-wide priority distortion
+        return Math.min(200.0, finalScore);
     }
 
     /**
