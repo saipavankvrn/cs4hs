@@ -54,6 +54,7 @@ public class AuthController {
         model.addAttribute("totalSubjects", user != null ? user.getSubjects().size() : 0);
         model.addAttribute("totalDocuments", user != null ? user.getDocuments().size() : 0);
         model.addAttribute("recentActivities", user != null ? activityRepository.findByUserOrderByTimestampDesc(user) : null);
+        model.addAttribute("user", user);
         return "dashboard";
     }
 
@@ -62,6 +63,40 @@ public class AuthController {
         User user = getLoggedInUser();
         model.addAttribute("user", user);
         return "profile";
+    }
+
+    @PostMapping("/profile/update")
+    public String updateProfile(@ModelAttribute User updatedUser) {
+        User user = getLoggedInUser();
+        if (user != null) {
+            try {
+                user.setUsername(updatedUser.getUsername());
+                user.setEmail(updatedUser.getEmail());
+                userRepository.save(user);
+                return "redirect:/profile?success";
+            } catch (Exception e) {
+                return "redirect:/profile?error=username_taken";
+            }
+        }
+        return "redirect:/profile";
+    }
+
+    @PostMapping("/profile/password")
+    public String updatePassword(@org.springframework.web.bind.annotation.RequestParam String oldPassword, 
+                                 @org.springframework.web.bind.annotation.RequestParam String newPassword, 
+                                 @org.springframework.web.bind.annotation.RequestParam String confirmPassword) {
+        User user = getLoggedInUser();
+        if (user != null) {
+            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+                return "redirect:/profile?error=wrong_password";
+            }
+            if (!newPassword.equals(confirmPassword)) {
+                return "redirect:/profile?error=mismatch";
+            }
+            user.setPassword(passwordEncoder.encode(newPassword));
+            userRepository.save(user);
+        }
+        return "redirect:/profile?pw_success";
     }
 
     private User getLoggedInUser() {

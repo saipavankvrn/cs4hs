@@ -101,6 +101,59 @@ public class StudyBoardController {
         return "redirect:/subjects/" + id + "/board";
     }
 
+    @PostMapping("/subjects/{subjectId}/cards/edit/{cardId}")
+    public String editStudyCard(@PathVariable("subjectId") Long subjectId,
+                                @PathVariable("cardId") Long cardId,
+                                @RequestParam("title") String title,
+                                @RequestParam("content") String content,
+                                @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+        User user = getLoggedInUser();
+        Subject subject = subjectRepository.findById(subjectId).orElse(null);
+        StudyCard card = studyCardRepository.findById(cardId).orElse(null);
+
+        if (subject != null && card != null && subject.getUser().getId().equals(user.getId()) && card.getSubject().getId().equals(subjectId)) {
+            card.setTitle(title);
+            card.setContent(content);
+
+            if (image != null && !image.isEmpty()) {
+                Path uploadPath = Paths.get(uploadDir);
+                if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+
+                String fileName = UUID.randomUUID().toString() + "_" + image.getOriginalFilename();
+                Files.copy(image.getInputStream(), uploadPath.resolve(fileName));
+                card.setImagePath(fileName);
+            }
+
+            studyCardRepository.save(card);
+
+            Activity activity = new Activity();
+            activity.setDescription("Updated revision card: " + title);
+            activity.setActivityType("STUDY_CARD_UPDATED");
+            activity.setUser(user);
+            activityRepository.save(activity);
+        }
+        return "redirect:/subjects/" + subjectId + "/board";
+    }
+
+    @PostMapping("/subjects/{subjectId}/cards/delete/{cardId}")
+    public String deleteStudyCard(@PathVariable("subjectId") Long subjectId,
+                                  @PathVariable("cardId") Long cardId) {
+        User user = getLoggedInUser();
+        Subject subject = subjectRepository.findById(subjectId).orElse(null);
+        StudyCard card = studyCardRepository.findById(cardId).orElse(null);
+
+        if (subject != null && card != null && subject.getUser().getId().equals(user.getId()) && card.getSubject().getId().equals(subjectId)) {
+            studyCardRepository.delete(card);
+
+            Activity activity = new Activity();
+            activity.setDescription("Deleted revision card: " + card.getTitle());
+            activity.setActivityType("STUDY_CARD_DELETED");
+            activity.setUser(user);
+            activityRepository.save(activity);
+        }
+        return "redirect:/subjects/" + subjectId + "/board";
+    }
+
     private User getLoggedInUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return userRepository.findByUsername(auth.getName()).orElse(null);

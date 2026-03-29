@@ -63,8 +63,49 @@
             </div>
 
             <div style="margin-top: 2rem; display: flex; gap: 10px;">
-                <button class="btn">Update Profile</button>
-                <button class="btn" style="background: #dfe6e9; color: #2d3436;">Change Password</button>
+                <button class="btn" onclick="document.getElementById('updateProfileForm').style.display='block'; document.getElementById('changePasswordForm').style.display='none';">Update Profile</button>
+                <button class="btn" style="background: #dfe6e9; color: #2d3436;" onclick="document.getElementById('changePasswordForm').style.display='block'; document.getElementById('updateProfileForm').style.display='none';">Change Password</button>
+            </div>
+
+            <!-- Profile Update Message Alerts -->
+            <div th:if="${param.success}" style="background: #dcfce7; color: #16a34a; padding: 10px; border-radius: 8px; margin-top: 1rem;">Profile updated successfully!</div>
+            <div th:if="${param.error != null and param.error[0] == 'username_taken'}" style="background: #fee2e2; color: #dc2626; padding: 10px; border-radius: 8px; margin-top: 1rem;">Username is already taken!</div>
+            <div th:if="${param.pw_success}" style="background: #dcfce7; color: #16a34a; padding: 10px; border-radius: 8px; margin-top: 1rem;">Password updated successfully!</div>
+            <div th:if="${param.error != null and param.error[0] == 'wrong_password'}" style="background: #fee2e2; color: #dc2626; padding: 10px; border-radius: 8px; margin-top: 1rem;">Incorrect old password!</div>
+            <div th:if="${param.error != null and param.error[0] == 'mismatch'}" style="background: #fee2e2; color: #dc2626; padding: 10px; border-radius: 8px; margin-top: 1rem;">New passwords do not match!</div>
+
+            <div id="updateProfileForm" style="display: none; margin-top: 2rem; background: #f9f9fb; padding: 1.5rem; border-radius: 12px; border: 1px solid #f1f2f6;">
+                <h3 style="margin-bottom: 1rem;"><i class="fas fa-user-edit" style="color: var(--primary)"></i> Edit Profile Details</h3>
+                <form th:action="@{/profile/update}" method="post">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Username</label>
+                        <input type="text" name="username" th:value="${user.username}" required style="width: 100%; padding: 10px; border: 2px solid #f1f2f6; border-radius: 8px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Email Address</label>
+                        <input type="email" name="email" th:value="${user.email}" required style="width: 100%; padding: 10px; border: 2px solid #f1f2f6; border-radius: 8px;">
+                    </div>
+                    <button type="submit" class="btn"><i class="fas fa-save"></i> Save Profile</button>
+                </form>
+            </div>
+
+            <div id="changePasswordForm" style="display: none; margin-top: 2rem; background: #fff5f5; padding: 1.5rem; border-radius: 12px; border: 1px solid #ffeaa7;">
+                <h3 style="margin-bottom: 1rem; color: #e17055;"><i class="fas fa-lock"></i> Change Password</h3>
+                <form th:action="@{/profile/password}" method="post">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Old Password</label>
+                        <input type="password" name="oldPassword" required style="width: 100%; padding: 10px; border: 2px solid #f1f2f6; border-radius: 8px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">New Password</label>
+                        <input type="password" name="newPassword" required style="width: 100%; padding: 10px; border: 2px solid #f1f2f6; border-radius: 8px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Confirm Password</label>
+                        <input type="password" name="confirmPassword" required style="width: 100%; padding: 10px; border: 2px solid #f1f2f6; border-radius: 8px;">
+                    </div>
+                    <button type="submit" class="btn" style="background: #e17055;"><i class="fas fa-key"></i> Update Password</button>
+                </form>
             </div>
         </div>
     </main>

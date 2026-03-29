@@ -51,23 +51,32 @@
         <div style="background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: var(--shadow);">
             <h3>Subject Files</h3>
             <div style="display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap;">
-                <div th:each="doc : ${documents}" 
-                     style="background: #f1f2f6; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                <a th:each="doc : ${documents}" th:href="@{'/uploads/' + ${doc.filePath}}" target="_blank"
+                   style="background: #f1f2f6; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; text-decoration: none; color: #2d3436; transition: background 0.2s;">
                      <i class="fas fa-file-pdf" style="color: #e74c3c"></i>
                      <span th:text="${doc.fileName}">Lecture.pdf</span>
-                </div>
+                </a>
                 <p th:if="${#lists.isEmpty(documents)}" style="color: var(--text-muted); font-size: 0.9rem;">No files uploaded for this subject yet.</p>
             </div>
         </div>
 
         <!-- Cards Grid -->
         <div class="board-container">
-            <div class="study-card-item" th:each="card : ${studyCards}">
-                <img th:if="${card.imagePath != null}" th:src="@{'/uploads/' + ${card.imagePath}}" class="card-img" alt="Card Image">
-                <div class="card-body">
+            <div class="study-card-item" th:each="card : ${studyCards}" style="cursor: pointer; position: relative;"
+                 th:data-subject-id="${subject.id}"
+                 th:data-card-id="${card.id}"
+                 th:data-title="${card.title}"
+                 th:data-content="${card.content}"
+                 th:data-image="${card.imagePath != null and card.imagePath != 'null' ? '/uploads/' + card.imagePath : ''}"
+                 onclick="openCardModalFromDiv(this)">
+                <img th:if="${card.imagePath != null and !#strings.isEmpty(card.imagePath) and card.imagePath != 'null'}" th:src="@{'/uploads/' + ${card.imagePath}}" class="card-img" alt="Card Image">
+                <div class="card-body" style="padding-bottom: 3.5rem;">
                     <span class="subject-badge" th:style="'background:' + ${subject.colorCode}" th:text="${subject.name}">Mathematics</span>
                     <h3 class="card-title" th:text="${card.title}">Quick Formula</h3>
                     <p class="card-content" th:text="${card.content}">E = mc²</p>
+                    <div style="position: absolute; bottom: 15px; right: 15px; color: var(--primary); font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-expand-arrows-alt"></i> View Card
+                    </div>
                 </div>
             </div>
         </div>
@@ -97,5 +106,106 @@
         </div>
     </main>
 
+    <!-- Overlay / Modal for Revision Card -->
+    <div id="cardModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; padding: 2.5rem; border-radius: 15px; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <span onclick="closeCardModal()" style="position: absolute; right: 25px; top: 20px; font-size: 1.8rem; cursor: pointer; color: #636e72;">&times;</span>
+            
+            <!-- View Mode -->
+            <div id="cardViewMode">
+                <h2 id="modalTitle" style="margin-bottom: 1.2rem; color: #2d3436; font-size: 1.8rem; padding-right: 30px;"></h2>
+                <img id="modalImage" src="" style="width: 100%; max-height: 350px; object-fit: contain; border-radius: 10px; margin-bottom: 1.5rem; display: none; background: #f8f9fa;">
+                <p id="modalContent" style="white-space: pre-wrap; color: #4b6584; line-height: 1.7; font-size: 1.05rem; margin-bottom: 2rem;"></p>
+                <div style="display: flex; gap: 15px; border-top: 1px solid #f1f2f6; padding-top: 1.5rem;">
+                    <button class="btn" onclick="toggleEditMode()" style="background: #f39c12;"><i class="fas fa-edit"></i> Edit Card</button>
+                    <form id="deleteCardForm" method="post" onsubmit="return confirm('Are you sure you want to delete this card?');" style="margin: 0;">
+                        <button type="submit" class="btn" style="background: #e74c3c;"><i class="fas fa-trash-alt"></i> Delete</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit Mode -->
+            <div id="cardEditMode" style="display: none;">
+                <h2 style="margin-bottom: 1.5rem; color: #2d3436;"><i class="fas fa-edit"></i> Edit Revision Card</h2>
+                <form id="editCardForm" method="post" enctype="multipart/form-data">
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #636e72;">Card Title</label>
+                        <input type="text" name="title" id="editTitle" required style="width: 100%; padding: 12px; border: 2px solid #f1f2f6; border-radius: 8px; font-size: 1rem;">
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #636e72;">Swap Image (Optional)</label>
+                        <input type="file" name="image" class="btn" style="background: #f1f2f6; color: #2d3436; width: 100%; padding: 12px;">
+                    </div>
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #636e72;">Explanation / Content</label>
+                        <textarea name="content" id="editContent" required rows="7" style="width: 100%; padding: 12px; border: 2px solid #f1f2f6; border-radius: 8px; font-size: 1rem;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn"><i class="fas fa-save"></i> Save Changes</button>
+                        <button type="button" class="btn" onclick="toggleEditMode()" style="background: #dfe6e9; color: #2d3436;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function openCardModalFromDiv(div) {
+        const subjectId = div.getAttribute('data-subject-id');
+        const cardId = div.getAttribute('data-card-id');
+        const title = div.getAttribute('data-title');
+        const content = div.getAttribute('data-content');
+        const imagePath = div.getAttribute('data-image');
+
+        document.getElementById('cardModal').style.display = 'flex';
+        document.getElementById('cardViewMode').style.display = 'block';
+        document.getElementById('cardEditMode').style.display = 'none';
+
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modalContent').innerText = content;
+        
+        const imgEl = document.getElementById('modalImage');
+        if (imagePath && imagePath.trim() !== '') {
+            imgEl.src = imagePath;
+            imgEl.style.display = 'block';
+        } else {
+            imgEl.style.display = 'none';
+            imgEl.src = '';
+        }
+
+        // Setup forms
+        document.getElementById('editTitle').value = title;
+        document.getElementById('editContent').value = content;
+        document.getElementById('editCardForm').action = '/subjects/' + subjectId + '/cards/edit/' + cardId;
+        document.getElementById('deleteCardForm').action = '/subjects/' + subjectId + '/cards/delete/' + cardId;
+        
+        // Prevent scrolling on body
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCardModal() {
+        document.getElementById('cardModal').style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+    }
+
+    function toggleEditMode() {
+        const viewMode = document.getElementById('cardViewMode');
+        const editMode = document.getElementById('cardEditMode');
+        if (viewMode.style.display === 'none') {
+            viewMode.style.display = 'block';
+            editMode.style.display = 'none';
+        } else {
+            viewMode.style.display = 'none';
+            editMode.style.display = 'block';
+        }
+    }
+    
+    // Close modal if overlay is clicked
+    document.getElementById('cardModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeCardModal();
+        }
+    });
+    </script>
 </body>
 </html>

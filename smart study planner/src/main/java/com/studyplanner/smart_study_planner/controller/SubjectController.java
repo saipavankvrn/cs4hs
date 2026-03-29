@@ -35,6 +35,40 @@ public class SubjectController {
         return "subjects";
     }
 
+    @PostMapping("/subjects/delete/{id}")
+    public String deleteSubject(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        User user = getLoggedInUser();
+        Subject subject = subjectRepository.findById(id).orElse(null);
+        if (subject != null && subject.getUser().getId().equals(user.getId())) {
+            subjectRepository.delete(subject);
+            
+            Activity activity = new Activity();
+            activity.setDescription("Deleted subject: " + subject.getName());
+            activity.setActivityType("SUBJECT_DELETED");
+            activity.setUser(user);
+            activityRepository.save(activity);
+        }
+        return "redirect:/subjects";
+    }
+
+    @PostMapping("/subjects/edit/{id}")
+    public String editSubject(@org.springframework.web.bind.annotation.PathVariable Long id, @ModelAttribute Subject updatedSubject) {
+        User user = getLoggedInUser();
+        Subject subject = subjectRepository.findById(id).orElse(null);
+        if (subject != null && subject.getUser().getId().equals(user.getId())) {
+            subject.setName(updatedSubject.getName());
+            subject.setColorCode(updatedSubject.getColorCode());
+            subject.setDescription(updatedSubject.getDescription());
+            subjectRepository.save(subject);
+            
+            Activity activity = new Activity();
+            activity.setDescription("Updated subject: " + subject.getName());
+            activity.setActivityType("SUBJECT_UPDATED");
+            activity.setUser(user);
+            activityRepository.save(activity);
+        }
+        return "redirect:/subjects";
+    }
     @PostMapping("/subjects/create")
     public String createSubject(@ModelAttribute Subject subject) {
         User user = getLoggedInUser();
