@@ -24,9 +24,10 @@ document.addEventListener("DOMContentLoaded", function() {
     // --- State Persistence ---
     function restoreState() {
         const state = localStorage.getItem('aiSidebarState');
-        if (state === 'open') { sidebar.classList.add('open'); fab.classList.add('hidden'); }
-        else if (state === 'expanded') { sidebar.classList.add('open', 'expanded'); fab.classList.add('hidden'); }
-        else if (state === 'minimized') { sidebar.classList.add('open', 'minimized'); fab.classList.add('hidden'); }
+        if (state === 'open') { sidebar.classList.remove('hidden'); setTimeout(() => sidebar.classList.add('open'), 10); fab.classList.add('hidden'); }
+        else if (state === 'expanded') { sidebar.classList.remove('hidden'); setTimeout(() => sidebar.classList.add('open', 'expanded'), 10); fab.classList.add('hidden'); }
+        else if (state === 'minimized') { sidebar.classList.remove('hidden'); setTimeout(() => sidebar.classList.add('open', 'minimized'), 10); fab.classList.add('hidden'); }
+        else { sidebar.classList.add('hidden'); fab.classList.remove('hidden'); } // Strict default hidden
         
         if (activeSessionId) {
             loadSession(activeSessionId);
@@ -42,16 +43,22 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // --- UI Toggles ---
     fab?.addEventListener('click', () => {
-        sidebar.classList.remove('hidden', 'minimized', 'expanded');
-        sidebar.classList.add('open');
+        sidebar.classList.remove('hidden');
+        setTimeout(() => {
+            sidebar.classList.remove('minimized', 'expanded');
+            sidebar.classList.add('open');
+        }, 10);
         fab.classList.add('hidden');
         saveState('open');
     });
     
     closeBtn?.addEventListener('click', () => {
         sidebar.classList.remove('open', 'expanded', 'minimized');
-        fab.classList.remove('hidden');
         historyDrawer.classList.remove('open');
+        setTimeout(() => {
+            sidebar.classList.add('hidden');
+            fab.classList.remove('hidden');
+        }, 300); // Wait for transition
         saveState('closed');
     });
 
