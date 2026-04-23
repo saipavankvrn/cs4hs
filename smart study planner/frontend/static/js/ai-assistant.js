@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function() {
-    alert("AI Assistant JS loaded!");
+    console.log("AI Assistant initialized.");
     const fab = document.getElementById('ai-fab');
     const sidebar = document.getElementById('ai-sidebar');
     const closeBtn = document.getElementById('ai-close-btn');
